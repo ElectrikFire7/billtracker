@@ -1,37 +1,60 @@
 package com.billtracker.service;
 
-import com.billtracker.dto.request.LoginRequest;
-import com.billtracker.dto.request.RegisterRequest;
+import com.billtracker.dto.request.GoogleOAuthRequest;
 import com.billtracker.dto.response.AuthResponse;
 import com.billtracker.dto.response.UserResponse;
 import com.billtracker.entity.User;
 import com.billtracker.repository.UserRepository;
 import com.billtracker.security.JwtUtil;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
-        }
+    @Value("${google.client-id}")
+    private String googleClientId;
 
-        User user = User.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .build();
+    public AuthResponse googleLogin(GoogleOAuthRequest request) {
+        GoogleIdToken.Payload payload = verifyGoogleToken(request.getCredential());
 
-        user = userRepository.save(user);
+        String email = payload.getEmail();
+        String name = (String) payload.get("name");
+        String googleId = payload.getSubject();
+
+        User user = userRepository.findByOauthIdAndOauthProvider(googleId, "google")
+                .orElseGet(() -> {
+                    // Check if a user with this email already exists (edge case)
+                    User existingUser = userRepository.findByEmail(email).orElse(null);
+                    if (existingUser != null) {
+                        // Link existing account to Google OAuth
+                        existingUser.setOauthProvider("google");
+                        existingUser.setOauthId(googleId);
+                        existingUser.setName(name != null ? name : existingUser.getName());
+                        return userRepository.save(existingUser);
+                    }
+
+                    // Create new user
+                    User newUser = User.builder()
+                            .name(name != null ? name : email.split("@")[0])
+                            .email(email)
+                            .oauthProvider("google")
+                            .oauthId(googleId)
+                            .build();
+                    return userRepository.save(newUser);
+                });
+
         String token = jwtUtil.generateToken(user.getEmail());
 
         return AuthResponse.builder()
@@ -40,19 +63,20 @@ public class AuthService {
                 .build();
     }
 
-    public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+    private GoogleIdToken.Payload verifyGoogleToken(String credential) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+            GoogleIdToken idToken = verifier.verify(credential);
+            if (idToken == null) {
+                throw new RuntimeException("Invalid Google token");
+            }
+            return idToken.getPayload();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to verify Google token: " + e.getMessage());
         }
-
-        String token = jwtUtil.generateToken(user.getEmail());
-
-        return AuthResponse.builder()
-                .token(token)
-                .user(UserResponse.from(user))
-                .build();
     }
 }

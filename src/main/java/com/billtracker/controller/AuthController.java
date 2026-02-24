@@ -1,7 +1,6 @@
 package com.billtracker.controller;
 
-import com.billtracker.dto.request.LoginRequest;
-import com.billtracker.dto.request.RegisterRequest;
+import com.billtracker.dto.request.GoogleOAuthRequest;
 import com.billtracker.dto.response.AuthResponse;
 import com.billtracker.service.AuthService;
 import jakarta.validation.Valid;
@@ -16,13 +15,8 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.register(request));
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleOAuthRequest request) {
+        return ResponseEntity.ok(authService.googleLogin(request));
     }
 }

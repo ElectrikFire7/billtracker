@@ -26,10 +26,11 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    private String phone;
+    @Column(name = "oauth_provider")
+    private String oauthProvider;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "oauth_id")
+    private String oauthId;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
