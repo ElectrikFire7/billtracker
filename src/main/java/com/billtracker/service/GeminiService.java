@@ -13,9 +13,14 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import com.billtracker.repository.UserRepository;
+import com.billtracker.entity.User;
+import java.time.LocalDate;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class GeminiService {
 
     @Value("${gemini.api.key}")
@@ -24,11 +29,26 @@ public class GeminiService {
     @Value("${gemini.api.url}")
     private String apiUrl;
 
+    private final UserRepository userRepository;
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final Gson gson = new Gson();
 
-    public List<Map<String, Object>> parseReceiptImage(byte[] imageBytes, String mimeType) {
+    public List<Map<String, Object>> parseReceiptImage(byte[] imageBytes, String mimeType, User user) {
         try {
+            LocalDate today = LocalDate.now();
+            if (user.getLastImageRequest() == null || user.getLastImageRequest().isBefore(today)) {
+                user.setLastImageRequest(today);
+                user.setImageRequestsToday(1);
+            } else if (user.getLastImageRequest().equals(today)) {
+                user.setImageRequestsToday(user.getImageRequestsToday() + 1);
+            }
+
+            if (user.getImageRequestsToday() > 5) {
+                throw new RuntimeException("Exhausted today's image uploads");
+            }
+            userRepository.save(user);
+
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
             String prompt = """

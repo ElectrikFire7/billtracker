@@ -38,4 +38,10 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "last_image_request")
+    private java.time.LocalDate lastImageRequest;
+
+    @Column(name = "image_requests_today")
+    private Integer imageRequestsToday;
 }
