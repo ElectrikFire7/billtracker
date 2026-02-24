@@ -14,7 +14,6 @@ public class UserResponse {
     private Long id;
     private String name;
     private String email;
-    private String phone;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -22,7 +21,6 @@ public class UserResponse {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .phone(user.getPhone())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

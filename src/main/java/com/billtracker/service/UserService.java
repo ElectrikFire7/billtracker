@@ -19,7 +19,6 @@ public class UserService {
 
     public UserResponse updateUser(User user, UpdateUserRequest request) {
         user.setName(request.getName());
-        user.setPhone(request.getPhone());
         user = userRepository.save(user);
         return UserResponse.from(user);
     }
