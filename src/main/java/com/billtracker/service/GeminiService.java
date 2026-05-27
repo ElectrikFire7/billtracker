@@ -61,6 +61,7 @@ public class GeminiService {
 
                     If quantity is not visible, assume 1.
                     If unit price is not visible, set it equal to totalPrice.
+                    If you see tax percentages at the bottom. Add it to the values of each individual item appropriately.
                     Return ONLY the JSON array, no markdown, no explanation.
                     """;
 

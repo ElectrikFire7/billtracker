@@ -4,6 +4,7 @@ import com.billtracker.entity.Bill;
 import com.billtracker.entity.BillItem;
 import com.billtracker.entity.BillItemMember;
 import com.billtracker.entity.BillSplit;
+import com.billtracker.entity.User;
 import com.billtracker.enums.SplitType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,8 +18,8 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 public class BillResponse {
-    private Long id;
-    private Long groupId;
+    private String id;
+    private String groupId;
     private UserResponse paidBy;
     private BigDecimal finalAmount;
     private String description;
@@ -32,7 +33,7 @@ public class BillResponse {
     @Builder
     @AllArgsConstructor
     public static class BillItemResponse {
-        private Long id;
+        private String id;
         private String itemName;
         private Integer quantity;
         private BigDecimal unitPrice;
@@ -44,8 +45,8 @@ public class BillResponse {
     @Builder
     @AllArgsConstructor
     public static class BillItemMemberResponse {
-        private Long id;
-        private Long userId;
+        private String id;
+        private String userId;
         private String userName;
         private BigDecimal shareAmount;
     }
@@ -54,18 +55,18 @@ public class BillResponse {
     @Builder
     @AllArgsConstructor
     public static class BillSplitResponse {
-        private Long id;
-        private Long userId;
+        private String id;
+        private String userId;
         private String userName;
         private BigDecimal amountOwed;
         private BigDecimal percentage;
     }
 
-    public static BillResponse from(Bill bill) {
+    public static BillResponse from(Bill bill, User paidBy) {
         return BillResponse.builder()
                 .id(bill.getId())
-                .groupId(bill.getGroup().getId())
-                .paidBy(UserResponse.from(bill.getPaidBy()))
+                .groupId(bill.getGroupId())
+                .paidBy(UserResponse.from(paidBy))
                 .finalAmount(bill.getFinalAmount())
                 .description(bill.getDescription())
                 .splitType(bill.getSplitType())
@@ -85,8 +86,8 @@ public class BillResponse {
                 .totalPrice(item.getTotalPrice())
                 .members(item.getBillItemMembers().stream().map(m -> BillItemMemberResponse.builder()
                         .id(m.getId())
-                        .userId(m.getUser().getId())
-                        .userName(m.getUser().getName())
+                        .userId(m.getUserId())
+                        .userName(m.getUserName())
                         .shareAmount(m.getShareAmount())
                         .build()).toList())
                 .build();
@@ -95,8 +96,8 @@ public class BillResponse {
     private static BillSplitResponse mapSplit(BillSplit split) {
         return BillSplitResponse.builder()
                 .id(split.getId())
-                .userId(split.getUser().getId())
-                .userName(split.getUser().getName())
+                .userId(split.getUserId())
+                .userName(split.getUserName())
                 .amountOwed(split.getAmountOwed())
                 .percentage(split.getPercentage())
                 .build();

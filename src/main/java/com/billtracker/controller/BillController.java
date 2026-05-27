@@ -20,35 +20,35 @@ public class BillController {
     private final BillService billService;
 
     @GetMapping
-    public ResponseEntity<List<BillResponse>> getBills(@PathVariable Long groupId,
+    public ResponseEntity<List<BillResponse>> getBills(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(billService.getBillsByGroup(groupId, user));
     }
 
     @GetMapping("/{billId}")
-    public ResponseEntity<BillResponse> getBill(@PathVariable Long groupId,
-            @PathVariable Long billId) {
+    public ResponseEntity<BillResponse> getBill(@PathVariable String groupId,
+            @PathVariable String billId) {
         return ResponseEntity.ok(billService.getBill(billId));
     }
 
     @PostMapping
-    public ResponseEntity<BillResponse> createBill(@PathVariable Long groupId,
+    public ResponseEntity<BillResponse> createBill(@PathVariable String groupId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody BillRequest request) {
         return ResponseEntity.ok(billService.createBill(groupId, user, request));
     }
 
     @PutMapping("/{billId}")
-    public ResponseEntity<BillResponse> updateBill(@PathVariable Long groupId,
-            @PathVariable Long billId,
+    public ResponseEntity<BillResponse> updateBill(@PathVariable String groupId,
+            @PathVariable String billId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody BillRequest request) {
         return ResponseEntity.ok(billService.updateBill(billId, user, request));
     }
 
     @DeleteMapping("/{billId}")
-    public ResponseEntity<Void> deleteBill(@PathVariable Long groupId,
-            @PathVariable Long billId,
+    public ResponseEntity<Void> deleteBill(@PathVariable String groupId,
+            @PathVariable String billId,
             @AuthenticationPrincipal User user) {
         billService.deleteBill(billId, user);
         return ResponseEntity.noContent().build();

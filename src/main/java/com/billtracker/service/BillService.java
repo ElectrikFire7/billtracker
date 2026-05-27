@@ -21,20 +21,26 @@ public class BillService {
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
 
-    public List<BillResponse> getBillsByGroup(Long groupId, User user) {
+    public List<BillResponse> getBillsByGroup(String groupId, User user) {
         ensureMember(groupId, user.getId());
         List<Bill> bills = billRepository.findByGroupIdOrderByCreatedAtDesc(groupId);
-        return bills.stream().map(BillResponse::from).toList();
+        return bills.stream().map(b -> {
+            User payer = userRepository.findById(b.getPaidById())
+                    .orElseThrow(() -> new RuntimeException("Payer not found"));
+            return BillResponse.from(b, payer);
+        }).toList();
     }
 
-    public BillResponse getBill(Long billId) {
+    public BillResponse getBill(String billId) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new RuntimeException("Bill not found"));
-        return BillResponse.from(bill);
+        User payer = userRepository.findById(bill.getPaidById())
+                .orElseThrow(() -> new RuntimeException("Payer not found"));
+        return BillResponse.from(bill, payer);
     }
 
     @Transactional
-    public BillResponse createBill(Long groupId, User user, BillRequest request) {
+    public BillResponse createBill(String groupId, User user, BillRequest request) {
         ensureMember(groupId, user.getId());
 
         Group group = groupRepository.findById(groupId)
@@ -42,12 +48,11 @@ public class BillService {
         User payer = userRepository.findById(request.getPaidByUserId())
                 .orElseThrow(() -> new RuntimeException("Payer not found"));
 
-        // Validate splits sum to finalAmount
         validateSplits(request);
 
         Bill bill = Bill.builder()
-                .group(group)
-                .paidBy(payer)
+                .groupId(group.getId())
+                .paidById(payer.getId())
                 .finalAmount(request.getFinalAmount())
                 .description(request.getDescription())
                 .splitType(request.getSplitType())
@@ -57,7 +62,6 @@ public class BillService {
         if (request.getItems() != null) {
             for (BillRequest.BillItemRequest itemReq : request.getItems()) {
                 BillItem item = BillItem.builder()
-                        .bill(bill)
                         .itemName(itemReq.getItemName())
                         .quantity(itemReq.getQuantity())
                         .unitPrice(itemReq.getUnitPrice())
@@ -69,8 +73,8 @@ public class BillService {
                         User memberUser = userRepository.findById(memberReq.getUserId())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
                         BillItemMember bim = BillItemMember.builder()
-                                .billItem(item)
-                                .user(memberUser)
+                                .userId(memberUser.getId())
+                                .userName(memberUser.getName()) // denormalized
                                 .shareAmount(memberReq.getShareAmount())
                                 .build();
                         item.getBillItemMembers().add(bim);
@@ -86,8 +90,8 @@ public class BillService {
             User splitUser = userRepository.findById(splitReq.getUserId())
                     .orElseThrow(() -> new RuntimeException("User not found"));
             BillSplit split = BillSplit.builder()
-                    .bill(bill)
-                    .user(splitUser)
+                    .userId(splitUser.getId())
+                    .userName(splitUser.getName()) // denormalized
                     .amountOwed(splitReq.getAmountOwed())
                     .percentage(splitReq.getPercentage())
                     .build();
@@ -95,36 +99,32 @@ public class BillService {
         }
 
         bill = billRepository.save(bill);
-        return BillResponse.from(bill);
+        return BillResponse.from(bill, payer);
     }
 
     @Transactional
-    public BillResponse updateBill(Long billId, User user, BillRequest request) {
+    public BillResponse updateBill(String billId, User user, BillRequest request) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new RuntimeException("Bill not found"));
-        ensureMember(bill.getGroup().getId(), user.getId());
+        ensureMember(bill.getGroupId(), user.getId());
 
         User payer = userRepository.findById(request.getPaidByUserId())
                 .orElseThrow(() -> new RuntimeException("Payer not found"));
 
         validateSplits(request);
 
-        bill.setPaidBy(payer);
+        bill.setPaidById(payer.getId());
         bill.setFinalAmount(request.getFinalAmount());
         bill.setDescription(request.getDescription());
         bill.setSplitType(request.getSplitType());
 
-        // Clear collections and flush to execute deletes before inserts (prevents
-        // unique constraint violations)
         bill.getBillItems().clear();
         bill.getBillSplits().clear();
-        billRepository.flush();
 
         // Re-add items
         if (request.getItems() != null) {
             for (BillRequest.BillItemRequest itemReq : request.getItems()) {
                 BillItem item = BillItem.builder()
-                        .bill(bill)
                         .itemName(itemReq.getItemName())
                         .quantity(itemReq.getQuantity())
                         .unitPrice(itemReq.getUnitPrice())
@@ -136,8 +136,8 @@ public class BillService {
                         User memberUser = userRepository.findById(memberReq.getUserId())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
                         BillItemMember bim = BillItemMember.builder()
-                                .billItem(item)
-                                .user(memberUser)
+                                .userId(memberUser.getId())
+                                .userName(memberUser.getName())
                                 .shareAmount(memberReq.getShareAmount())
                                 .build();
                         item.getBillItemMembers().add(bim);
@@ -153,8 +153,8 @@ public class BillService {
             User splitUser = userRepository.findById(splitReq.getUserId())
                     .orElseThrow(() -> new RuntimeException("User not found"));
             BillSplit split = BillSplit.builder()
-                    .bill(bill)
-                    .user(splitUser)
+                    .userId(splitUser.getId())
+                    .userName(splitUser.getName())
                     .amountOwed(splitReq.getAmountOwed())
                     .percentage(splitReq.getPercentage())
                     .build();
@@ -162,14 +162,14 @@ public class BillService {
         }
 
         bill = billRepository.save(bill);
-        return BillResponse.from(bill);
+        return BillResponse.from(bill, payer);
     }
 
     @Transactional
-    public void deleteBill(Long billId, User user) {
+    public void deleteBill(String billId, User user) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new RuntimeException("Bill not found"));
-        ensureMember(bill.getGroup().getId(), user.getId());
+        ensureMember(bill.getGroupId(), user.getId());
         billRepository.delete(bill);
     }
 
@@ -194,7 +194,7 @@ public class BillService {
         }
     }
 
-    private void ensureMember(Long groupId, Long userId) {
+    private void ensureMember(String groupId, String userId) {
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
             throw new RuntimeException("You are not a member of this group");
         }

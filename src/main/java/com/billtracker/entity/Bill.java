@@ -1,18 +1,18 @@
 package com.billtracker.entity;
 
 import com.billtracker.enums.SplitType;
-import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "bill")
+@Document(collection = "bills")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,39 +21,27 @@ import java.util.List;
 public class Bill {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    private String groupId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "paid_by", nullable = false)
-    private User paidBy;
+    private String paidById;
 
-    @Column(name = "final_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal finalAmount;
 
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "split_type", nullable = false)
     private SplitType splitType;
 
-    @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BillItem> billItems = new ArrayList<>();
 
-    @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BillSplit> billSplits = new ArrayList<>();
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @CreatedDate
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
+    @LastModifiedDate
     private LocalDateTime updatedAt;
 }

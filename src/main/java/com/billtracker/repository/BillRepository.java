@@ -1,10 +1,10 @@
 package com.billtracker.repository;
 
 import com.billtracker.entity.Bill;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface BillRepository extends JpaRepository<Bill, Long> {
-    List<Bill> findByGroupIdOrderByCreatedAtDesc(Long groupId);
+public interface BillRepository extends MongoRepository<Bill, String> {
+    List<Bill> findByGroupIdOrderByCreatedAtDesc(String groupId);
 }

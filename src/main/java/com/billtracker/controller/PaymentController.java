@@ -20,29 +20,29 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @GetMapping
-    public ResponseEntity<List<PaymentResponse>> getPayments(@PathVariable Long groupId,
+    public ResponseEntity<List<PaymentResponse>> getPayments(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(paymentService.getPaymentsByGroup(groupId, user));
     }
 
     @PostMapping
-    public ResponseEntity<PaymentResponse> createPayment(@PathVariable Long groupId,
+    public ResponseEntity<PaymentResponse> createPayment(@PathVariable String groupId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody PaymentRequest request) {
         return ResponseEntity.ok(paymentService.createPayment(groupId, user, request));
     }
 
     @PutMapping("/{paymentId}")
-    public ResponseEntity<PaymentResponse> updatePayment(@PathVariable Long groupId,
-            @PathVariable Long paymentId,
+    public ResponseEntity<PaymentResponse> updatePayment(@PathVariable String groupId,
+            @PathVariable String paymentId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody PaymentRequest request) {
         return ResponseEntity.ok(paymentService.updatePayment(groupId, paymentId, user, request));
     }
 
     @DeleteMapping("/{paymentId}")
-    public ResponseEntity<Void> deletePayment(@PathVariable Long groupId,
-            @PathVariable Long paymentId,
+    public ResponseEntity<Void> deletePayment(@PathVariable String groupId,
+            @PathVariable String paymentId,
             @AuthenticationPrincipal User user) {
         paymentService.deletePayment(groupId, paymentId, user);
         return ResponseEntity.noContent().build();

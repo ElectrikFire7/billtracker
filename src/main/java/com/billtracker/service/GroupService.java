@@ -23,14 +23,17 @@ public class GroupService {
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
     private final BillRepository billRepository;
-    private final BillSplitRepository billSplitRepository;
     private final PaymentRepository paymentRepository;
 
     public List<GroupResponse> getUserGroups(User user) {
-        List<Group> groups = groupRepository.findGroupsByUserId(user.getId());
+        List<String> groupIds = groupMemberRepository.findByUserId(user.getId()).stream()
+                .map(GroupMember::getGroupId).toList();
+        List<Group> groups = groupRepository.findAllByIdInOrderByCreatedAtDesc(groupIds);
         return groups.stream().map(g -> {
             int count = groupMemberRepository.findByGroupId(g.getId()).size();
-            return GroupResponse.from(g, count);
+            User creator = userRepository.findById(g.getCreatedById())
+                    .orElseThrow(() -> new RuntimeException("Creator not found"));
+            return GroupResponse.from(g, creator, count);
         }).toList();
     }
 
@@ -38,31 +41,33 @@ public class GroupService {
     public GroupResponse createGroup(User user, GroupRequest request) {
         Group group = Group.builder()
                 .name(request.getName())
-                .createdBy(user)
+                .createdById(user.getId())
                 .build();
         group = groupRepository.save(group);
 
         // Add creator as member
         GroupMember member = GroupMember.builder()
-                .group(group)
-                .user(user)
+                .groupId(group.getId())
+                .userId(user.getId())
                 .dateOfJoining(LocalDateTime.now())
                 .build();
         groupMemberRepository.save(member);
 
-        return GroupResponse.from(group, 1);
+        return GroupResponse.from(group, user, 1);
     }
 
-    public GroupResponse getGroup(Long groupId, User user) {
+    public GroupResponse getGroup(String groupId, User user) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
         ensureMember(groupId, user.getId());
         int count = groupMemberRepository.findByGroupId(groupId).size();
-        return GroupResponse.from(group, count);
+        User creator = userRepository.findById(group.getCreatedById())
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+        return GroupResponse.from(group, creator, count);
     }
 
     @Transactional
-    public GroupResponse addMember(Long groupId, User user, AddMemberRequest request) {
+    public GroupResponse addMember(String groupId, User user, AddMemberRequest request) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
         ensureMember(groupId, user.getId());
@@ -75,40 +80,43 @@ public class GroupService {
         }
 
         GroupMember member = GroupMember.builder()
-                .group(group)
-                .user(newUser)
+                .groupId(group.getId())
+                .userId(newUser.getId())
                 .dateOfJoining(LocalDateTime.now())
                 .build();
         groupMemberRepository.save(member);
 
         int count = groupMemberRepository.findByGroupId(groupId).size();
-        return GroupResponse.from(group, count);
+        User creator = userRepository.findById(group.getCreatedById())
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+        return GroupResponse.from(group, creator, count);
     }
 
     @Transactional
-    public void removeMember(Long groupId, Long memberId, User user) {
+    public void removeMember(String groupId, String memberId, User user) {
         ensureMember(groupId, user.getId());
         GroupMember member = groupMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("Member not found"));
-        if (!member.getGroup().getId().equals(groupId)) {
+        if (!member.getGroupId().equals(groupId)) {
             throw new RuntimeException("Member does not belong to this group");
         }
         groupMemberRepository.delete(member);
     }
 
-    public List<UserResponse> getMembers(Long groupId, User user) {
+    public List<UserResponse> getMembers(String groupId, User user) {
         ensureMember(groupId, user.getId());
         return groupMemberRepository.findByGroupId(groupId).stream()
-                .map(gm -> UserResponse.from(gm.getUser()))
+                .map(gm -> userRepository.findById(gm.getUserId()).orElseThrow())
+                .map(UserResponse::from)
                 .toList();
     }
 
     @Transactional
-    public void deleteGroup(Long groupId, User user) {
+    public void deleteGroup(String groupId, User user) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
 
-        if (!group.getCreatedBy().getId().equals(user.getId())) {
+        if (!group.getCreatedById().equals(user.getId())) {
             throw new RuntimeException("Only the group creator can delete the group");
         }
 
@@ -125,7 +133,7 @@ public class GroupService {
         groupRepository.delete(group);
     }
 
-    public List<BalanceResponse> calculateBalances(Long groupId, User user) {
+    public List<BalanceResponse> calculateBalances(String groupId, User user) {
         ensureMember(groupId, user.getId());
 
         List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
@@ -133,75 +141,66 @@ public class GroupService {
         List<Payment> payments = paymentRepository.findByGroupId(groupId);
 
         // Map: userId -> net amount (positive = they are owed, negative = they owe)
-        Map<Long, BigDecimal> netMap = new HashMap<>();
+        Map<String, BigDecimal> netMap = new HashMap<>();
         for (GroupMember m : members) {
-            netMap.put(m.getUser().getId(), BigDecimal.ZERO);
+            netMap.put(m.getUserId(), BigDecimal.ZERO);
         }
 
         // Process bills
         for (Bill bill : bills) {
-            Long paidById = bill.getPaidBy().getId();
+            String paidById = bill.getPaidById();
             // The payer paid the full amount
             netMap.merge(paidById, bill.getFinalAmount(), BigDecimal::add);
 
             // Each split user owes their share
             for (var split : bill.getBillSplits()) {
-                netMap.merge(split.getUser().getId(), split.getAmountOwed().negate(), BigDecimal::add);
+                netMap.merge(split.getUserId(), split.getAmountOwed().negate(), BigDecimal::add);
             }
         }
 
         // Process payments
         for (Payment payment : payments) {
-            netMap.merge(payment.getFromUser().getId(), payment.getAmount(), BigDecimal::add);
-            netMap.merge(payment.getToUser().getId(), payment.getAmount().negate(), BigDecimal::add);
+            netMap.merge(payment.getFromUserId(), payment.getAmount(), BigDecimal::add);
+            netMap.merge(payment.getToUserId(), payment.getAmount().negate(), BigDecimal::add);
         }
 
         // Build per-user balance relative to the requesting user
-        // For the requesting user, show balance with each other member
-        // positive = other user owes you, negative = you owe other user
-        BigDecimal myNet = netMap.getOrDefault(user.getId(), BigDecimal.ZERO);
-
         List<BalanceResponse> result = new ArrayList<>();
-        Map<Long, String> nameMap = new HashMap<>();
+        Map<String, String> nameMap = new HashMap<>();
         for (GroupMember m : members) {
-            nameMap.put(m.getUser().getId(), m.getUser().getName());
+            User u = userRepository.findById(m.getUserId()).orElseThrow();
+            nameMap.put(u.getId(), u.getName());
         }
 
         // Compute pairwise balances from bills and payments
-        // Simpler approach: for each other member, compute net between current user and
-        // that member
-        Map<Long, BigDecimal> pairwise = new HashMap<>();
+        Map<String, BigDecimal> pairwise = new HashMap<>();
         for (Bill bill : bills) {
-            Long paidById = bill.getPaidBy().getId();
+            String paidById = bill.getPaidById();
             for (var split : bill.getBillSplits()) {
-                Long owerId = split.getUser().getId();
+                String owerId = split.getUserId();
                 if (paidById.equals(user.getId()) && !owerId.equals(user.getId())) {
-                    // Other user owes me
                     pairwise.merge(owerId, split.getAmountOwed(), BigDecimal::add);
                 } else if (owerId.equals(user.getId()) && !paidById.equals(user.getId())) {
-                    // I owe other user
                     pairwise.merge(paidById, split.getAmountOwed().negate(), BigDecimal::add);
                 }
             }
         }
 
         for (Payment payment : payments) {
-            if (payment.getFromUser().getId().equals(user.getId())) {
-                // I paid someone => increases what they owe me (or reduces what I owe them)
-                pairwise.merge(payment.getToUser().getId(), payment.getAmount(), BigDecimal::add);
-            } else if (payment.getToUser().getId().equals(user.getId())) {
-                // Someone paid me => reduce what they owe me
-                pairwise.merge(payment.getFromUser().getId(), payment.getAmount().negate(), BigDecimal::add);
+            if (payment.getFromUserId().equals(user.getId())) {
+                pairwise.merge(payment.getToUserId(), payment.getAmount(), BigDecimal::add);
+            } else if (payment.getToUserId().equals(user.getId())) {
+                pairwise.merge(payment.getFromUserId(), payment.getAmount().negate(), BigDecimal::add);
             }
         }
 
         for (GroupMember m : members) {
-            if (m.getUser().getId().equals(user.getId()))
+            if (m.getUserId().equals(user.getId()))
                 continue;
-            BigDecimal net = pairwise.getOrDefault(m.getUser().getId(), BigDecimal.ZERO);
+            BigDecimal net = pairwise.getOrDefault(m.getUserId(), BigDecimal.ZERO);
             result.add(BalanceResponse.builder()
-                    .userId(m.getUser().getId())
-                    .userName(m.getUser().getName())
+                    .userId(m.getUserId())
+                    .userName(nameMap.get(m.getUserId()))
                     .netBalance(net)
                     .build());
         }
@@ -209,7 +208,7 @@ public class GroupService {
         return result;
     }
 
-    private void ensureMember(Long groupId, Long userId) {
+    private void ensureMember(String groupId, String userId) {
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
             throw new RuntimeException("You are not a member of this group");
         }

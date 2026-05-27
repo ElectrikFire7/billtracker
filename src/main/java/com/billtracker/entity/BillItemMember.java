@@ -1,14 +1,10 @@
 package com.billtracker.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
-@Entity
-@Table(name = "bill_item_member", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "bill_item_id", "user_id" })
-})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,18 +12,12 @@ import java.math.BigDecimal;
 @Builder
 public class BillItemMember {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Builder.Default
+    private String id = UUID.randomUUID().toString();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bill_item_id", nullable = false)
-    private BillItem billItem;
+    private String userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private String userName;
 
-    @Column(name = "share_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal shareAmount;
 }

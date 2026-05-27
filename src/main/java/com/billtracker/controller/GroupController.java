@@ -34,41 +34,41 @@ public class GroupController {
     }
 
     @GetMapping("/{groupId}")
-    public ResponseEntity<GroupResponse> getGroup(@PathVariable Long groupId,
+    public ResponseEntity<GroupResponse> getGroup(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(groupService.getGroup(groupId, user));
     }
 
     @DeleteMapping("/{groupId}")
-    public ResponseEntity<Void> deleteGroup(@PathVariable Long groupId,
+    public ResponseEntity<Void> deleteGroup(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         groupService.deleteGroup(groupId, user);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{groupId}/members")
-    public ResponseEntity<GroupResponse> addMember(@PathVariable Long groupId,
+    public ResponseEntity<GroupResponse> addMember(@PathVariable String groupId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody AddMemberRequest request) {
         return ResponseEntity.ok(groupService.addMember(groupId, user, request));
     }
 
     @GetMapping("/{groupId}/members")
-    public ResponseEntity<List<UserResponse>> getMembers(@PathVariable Long groupId,
+    public ResponseEntity<List<UserResponse>> getMembers(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(groupService.getMembers(groupId, user));
     }
 
     @DeleteMapping("/{groupId}/members/{memberId}")
-    public ResponseEntity<Void> removeMember(@PathVariable Long groupId,
-            @PathVariable Long memberId,
+    public ResponseEntity<Void> removeMember(@PathVariable String groupId,
+            @PathVariable String memberId,
             @AuthenticationPrincipal User user) {
         groupService.removeMember(groupId, memberId, user);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{groupId}/balances")
-    public ResponseEntity<List<BalanceResponse>> getBalances(@PathVariable Long groupId,
+    public ResponseEntity<List<BalanceResponse>> getBalances(@PathVariable String groupId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(groupService.calculateBalances(groupId, user));
     }

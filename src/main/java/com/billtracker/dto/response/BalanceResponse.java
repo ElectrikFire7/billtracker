@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Builder
 @AllArgsConstructor
 public class BalanceResponse {
-    private Long userId;
+    private String userId;
     private String userName;
     private BigDecimal netBalance; // positive = owed to you, negative = you owe
 }

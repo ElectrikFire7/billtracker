@@ -13,7 +13,7 @@ import java.util.List;
 public class BillRequest {
 
     @NotNull
-    private Long paidByUserId;
+    private String paidByUserId;
 
     @NotNull
     private BigDecimal finalAmount;
@@ -49,7 +49,7 @@ public class BillRequest {
     @Data
     public static class BillItemMemberRequest {
         @NotNull
-        private Long userId;
+        private String userId;
         @NotNull
         private BigDecimal shareAmount;
     }
@@ -57,7 +57,7 @@ public class BillRequest {
     @Data
     public static class BillSplitRequest {
         @NotNull
-        private Long userId;
+        private String userId;
         @NotNull
         private BigDecimal amountOwed;
         private BigDecimal percentage;

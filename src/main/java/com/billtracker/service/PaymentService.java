@@ -24,15 +24,19 @@ public class PaymentService {
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
 
-    public List<PaymentResponse> getPaymentsByGroup(Long groupId, User user) {
+    public List<PaymentResponse> getPaymentsByGroup(String groupId, User user) {
         ensureMember(groupId, user.getId());
         return paymentRepository.findByGroupIdOrderByCreatedAtDesc(groupId).stream()
-                .map(PaymentResponse::from)
+                .map(p -> {
+                    User fromUser = userRepository.findById(p.getFromUserId()).orElseThrow();
+                    User toUser = userRepository.findById(p.getToUserId()).orElseThrow();
+                    return PaymentResponse.from(p, fromUser, toUser);
+                })
                 .toList();
     }
 
     @Transactional
-    public PaymentResponse createPayment(Long groupId, User user, PaymentRequest request) {
+    public PaymentResponse createPayment(String groupId, User user, PaymentRequest request) {
         ensureMember(groupId, user.getId());
 
         Group group = groupRepository.findById(groupId)
@@ -43,27 +47,27 @@ public class PaymentService {
         ensureMember(groupId, toUser.getId());
 
         Payment payment = Payment.builder()
-                .group(group)
-                .fromUser(user)
-                .toUser(toUser)
+                .groupId(group.getId())
+                .fromUserId(user.getId())
+                .toUserId(toUser.getId())
                 .amount(request.getAmount())
                 .build();
 
         payment = paymentRepository.save(payment);
-        return PaymentResponse.from(payment);
+        return PaymentResponse.from(payment, user, toUser);
     }
 
     @Transactional
-    public PaymentResponse updatePayment(Long groupId, Long paymentId, User user, PaymentRequest request) {
+    public PaymentResponse updatePayment(String groupId, String paymentId, User user, PaymentRequest request) {
         ensureMember(groupId, user.getId());
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-        if (!payment.getGroup().getId().equals(groupId)) {
+        if (!payment.getGroupId().equals(groupId)) {
             throw new RuntimeException("Payment does not belong to this group");
         }
 
-        if (!payment.getFromUser().getId().equals(user.getId())) {
+        if (!payment.getFromUserId().equals(user.getId())) {
             throw new RuntimeException("You can only edit payments that you recorded");
         }
 
@@ -71,31 +75,31 @@ public class PaymentService {
                 .orElseThrow(() -> new RuntimeException("Recipient user not found"));
         ensureMember(groupId, toUser.getId());
 
-        payment.setToUser(toUser);
+        payment.setToUserId(toUser.getId());
         payment.setAmount(request.getAmount());
 
         payment = paymentRepository.save(payment);
-        return PaymentResponse.from(payment);
+        return PaymentResponse.from(payment, user, toUser);
     }
 
     @Transactional
-    public void deletePayment(Long groupId, Long paymentId, User user) {
+    public void deletePayment(String groupId, String paymentId, User user) {
         ensureMember(groupId, user.getId());
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-        if (!payment.getGroup().getId().equals(groupId)) {
+        if (!payment.getGroupId().equals(groupId)) {
             throw new RuntimeException("Payment does not belong to this group");
         }
 
-        if (!payment.getFromUser().getId().equals(user.getId())) {
+        if (!payment.getFromUserId().equals(user.getId())) {
             throw new RuntimeException("You can only delete payments that you recorded");
         }
 
         paymentRepository.delete(payment);
     }
 
-    private void ensureMember(Long groupId, Long userId) {
+    private void ensureMember(String groupId, String userId) {
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
             throw new RuntimeException("You are not a member of this group");
         }

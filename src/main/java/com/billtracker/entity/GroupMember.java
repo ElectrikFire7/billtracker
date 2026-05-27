@@ -1,14 +1,14 @@
 package com.billtracker.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "group_member", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "group_id", "user_id" })
-})
+@Document(collection = "group_members")
+@CompoundIndex(name = "group_user_idx", def = "{'groupId': 1, 'userId': 1}", unique = true)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,22 +17,15 @@ import java.time.LocalDateTime;
 public class GroupMember {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    private String groupId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private String userId;
 
-    @Column(name = "date_of_joining", nullable = false)
     private LocalDateTime dateOfJoining;
 
-    @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         if (dateOfJoining == null) {
             dateOfJoining = LocalDateTime.now();
         }

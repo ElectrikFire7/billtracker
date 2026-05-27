@@ -1,17 +1,19 @@
 package com.billtracker.repository;
 
 import com.billtracker.entity.GroupMember;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
-    List<GroupMember> findByGroupId(Long groupId);
+public interface GroupMemberRepository extends MongoRepository<GroupMember, String> {
+    List<GroupMember> findByGroupId(String groupId);
 
-    Optional<GroupMember> findByGroupIdAndUserId(Long groupId, Long userId);
+    List<GroupMember> findByUserId(String userId);
 
-    boolean existsByGroupIdAndUserId(Long groupId, Long userId);
+    Optional<GroupMember> findByGroupIdAndUserId(String groupId, String userId);
 
-    void deleteByGroupIdAndUserId(Long groupId, Long userId);
+    boolean existsByGroupIdAndUserId(String groupId, String userId);
+
+    void deleteByGroupIdAndUserId(String groupId, String userId);
 }
