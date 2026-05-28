@@ -7,4 +7,6 @@ import lombok.Data;
 public class UpdateUserRequest {
     @NotBlank
     private String name;
+
+    private String upiId;
 }

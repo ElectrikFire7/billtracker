@@ -38,4 +38,6 @@ public class User {
     private java.time.LocalDate lastImageRequest;
 
     private Integer imageRequestsToday;
+
+    private String upiId;
 }

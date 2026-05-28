@@ -15,6 +15,7 @@ public class UserResponse {
     private String name;
     private String email;
     private LocalDateTime createdAt;
+    private String upiId;
 
     public static UserResponse from(User user) {
         return UserResponse.builder()
@@ -22,6 +23,7 @@ public class UserResponse {
                 .name(user.getName())
                 .email(user.getEmail())
                 .createdAt(user.getCreatedAt())
+                .upiId(user.getUpiId())
                 .build();
     }
 }
